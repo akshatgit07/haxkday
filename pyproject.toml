@@ -1,0 +1,15 @@
+[project]
+name = "haxkday"
+version = "0.1.0"
+description = "haxkday"
+requires-python = ">=3.9"
+dependencies = [
+    "daytona>=0.200.2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
