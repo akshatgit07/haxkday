@@ -2,21 +2,16 @@ import asyncio
 import os
 
 from haxkday.agents.valuation_agent import ValuationAgent
+from haxkday.integrations.alpha_vantage_client import AlphaVantageClient
 from haxkday.integrations.daytona_client import DaytonaSandboxClient
-from haxkday.models.schemas import FinancialSnapshot
 
 
 async def main() -> None:
+    alpha_vantage = AlphaVantageClient(api_key=os.environ["ALPHA_VANTAGE_API_KEY"])
     daytona = DaytonaSandboxClient(api_key=os.environ["DAYTONA_API_KEY"])
-    agent = ValuationAgent(daytona)
+    agent = ValuationAgent(alpha_vantage, daytona)
 
-    snapshot = FinancialSnapshot(
-        ticker="NVDA",
-        revenue_growth_pct=52.0,
-        gross_margin_pct=75.0,
-        free_cash_flow=30000.0,
-    )
-    result = await agent.run(snapshot)
+    result = await agent.run("NVDA")
     print(result.model_dump_json(indent=2))
 
 

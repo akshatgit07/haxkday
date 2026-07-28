@@ -2,6 +2,7 @@ import asyncio
 import inspect
 import json
 
+from ..integrations.alpha_vantage_client import AlphaVantageClient
 from ..integrations.daytona_client import DaytonaSandboxClient
 from ..models.schemas import FinancialSnapshot, ValuationResult
 from ..sandbox import financial_models
@@ -14,16 +15,21 @@ _PROJECTION_YEARS = 5
 
 
 class ValuationAgent(Agent):
-    """Runs DCF valuation inside the Daytona sandbox. PE, EV/EBITDA, PEG, and comparable-
-    company analysis aren't wired up yet — they need price/EPS/EBITDA data this pipeline
-    doesn't have a source for."""
+    """Runs DCF valuation inside the Daytona sandbox, on fundamentals pulled from Alpha
+    Vantage. PE, EV/EBITDA, PEG, and comparable-company analysis aren't wired up yet —
+    they need price/EPS/EBITDA data this pipeline doesn't have a source for."""
 
     name = "valuation_analyst"
 
-    def __init__(self, daytona: DaytonaSandboxClient) -> None:
+    def __init__(self, alpha_vantage: AlphaVantageClient, daytona: DaytonaSandboxClient) -> None:
+        self.alpha_vantage = alpha_vantage
         self.daytona = daytona
 
-    async def run(self, financials: FinancialSnapshot) -> ValuationResult:
+    async def run(self, ticker: str) -> ValuationResult:
+        financials = await self.alpha_vantage.get_financial_snapshot(ticker)
+        return await self._run_dcf(financials)
+
+    async def _run_dcf(self, financials: FinancialSnapshot) -> ValuationResult:
         if financials.free_cash_flow is None:
             return ValuationResult()
 
