@@ -11,6 +11,8 @@ from ..models.schemas import (
 from ..utils import strip_json_fence
 from .base import Agent
 
+_MAX_FILING_CHARS = 12_000
+
 _SYSTEM_PROMPT = (
     "You are the Investment Memo Agent for an autonomous financial analyst. "
     "Given a ticker and whatever research/market/valuation/risk data is "
@@ -42,7 +44,7 @@ class InvestmentMemoAgent(Agent):
         user_prompt = json.dumps(
             {
                 "ticker": ticker,
-                "filings": [f.model_dump() for f in filings],
+                "filings": [_truncate_filing(f) for f in filings],
                 "market": market.model_dump() if market else None,
                 "valuation": valuation.model_dump() if valuation else None,
                 "risk": risk.model_dump() if risk else None,
@@ -50,3 +52,9 @@ class InvestmentMemoAgent(Agent):
         )
         raw = await self.fireworks.complete(_SYSTEM_PROMPT, user_prompt)
         return InvestmentMemo.model_validate_json(strip_json_fence(raw))
+
+
+def _truncate_filing(filing: FilingExcerpt) -> dict:
+    data = filing.model_dump()
+    data["text"] = data["text"][:_MAX_FILING_CHARS]
+    return data
