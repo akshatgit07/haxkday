@@ -2,11 +2,12 @@
 
 Everything is real (routing, request validation, Planner -> Research ->
 Valuation -> Memo agent orchestration, JSON parsing, Pydantic response
-validation) except the network calls themselves (Fireworks, SEC EDGAR,
-Alpha Vantage, Daytona), which are mocked here. Use this to see the
-pipeline work when live outbound access isn't available (e.g. inside a
-network-restricted sandbox); with real network access, drop the
-`patch(...)` calls and it hits all four APIs for real.
+validation, Braintrust trace-step sequencing) except the network calls
+themselves (Fireworks, SEC EDGAR, Alpha Vantage, Daytona, Braintrust),
+which are mocked here. Use this to see the pipeline work when live
+outbound access isn't available (e.g. inside a network-restricted
+sandbox); with real network access, drop the `patch(...)` calls and it
+hits all five APIs for real.
 """
 
 import asyncio
@@ -81,6 +82,7 @@ async def main() -> None:
         patch("haxkday.api.routes.analyze.SecEdgarClient") as MockSecEdgar,
         patch("haxkday.api.routes.analyze.AlphaVantageClient") as MockAlphaVantage,
         patch("haxkday.api.routes.analyze.DaytonaSandboxClient") as MockDaytona,
+        patch("haxkday.api.routes.analyze.BraintrustClient") as MockBraintrust,
     ):
         MockFireworks.return_value.complete = AsyncMock(
             side_effect=[MOCK_PLANNER_RESPONSE, MOCK_MEMO_RESPONSE]
@@ -91,6 +93,9 @@ async def main() -> None:
         MockAlphaVantage.return_value.get_financial_snapshot = AsyncMock(return_value=MOCK_FINANCIALS)
         MockDaytona.return_value.run_code = MagicMock(return_value=json.dumps({"dcf_fair_value": 987654.32}))
 
+        bt = MockBraintrust.return_value
+        bt.start_trace = MagicMock(return_value="trace-123")
+
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             response = await client.post(
@@ -98,7 +103,10 @@ async def main() -> None:
                 json={"query": "Should I invest in Nvidia?", "ticker": "NVDA"},
             )
 
-    print(f"HTTP {response.status_code}\n")
+        print("Braintrust spans logged:", [call.kwargs["name"] for call in bt.log_span.call_args_list])
+        print("Braintrust score:", bt.score.call_args)
+
+    print(f"\nHTTP {response.status_code}\n")
     print(json.dumps(response.json(), indent=2))
 
 

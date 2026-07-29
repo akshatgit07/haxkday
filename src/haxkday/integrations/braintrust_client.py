@@ -26,8 +26,16 @@ class BraintrustClient:
         with parent.start_span(name=name) as child:
             child.log(input=input, output=output, metadata=metadata or {})
 
-    def score(self, trace_id: str, hallucination_score: float, confidence: float) -> None:
-        """Attach evaluation scores to a completed trace, then close it."""
+    def score(self, trace_id: str, confidence: float, hallucination_score: float | None = None) -> None:
+        """Attach evaluation scores to a completed trace, then close it.
+
+        hallucination_score is optional: there's no automated hallucination
+        evaluator wired up yet, so callers that don't have a real one should
+        leave it out rather than pass a made-up number.
+        """
         span = self._spans.pop(trace_id)
-        span.log(scores={"hallucination": hallucination_score, "confidence": confidence})
+        scores = {"confidence": confidence}
+        if hallucination_score is not None:
+            scores["hallucination"] = hallucination_score
+        span.log(scores=scores)
         span.end()
