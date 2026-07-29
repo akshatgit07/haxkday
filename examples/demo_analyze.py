@@ -78,11 +78,11 @@ MOCK_MEMO_RESPONSE = json.dumps(
 
 async def main() -> None:
     with (
-        patch("haxkday.api.routes.analyze.FireworksClient") as MockFireworks,
-        patch("haxkday.api.routes.analyze.SecEdgarClient") as MockSecEdgar,
-        patch("haxkday.api.routes.analyze.AlphaVantageClient") as MockAlphaVantage,
-        patch("haxkday.api.routes.analyze.DaytonaSandboxClient") as MockDaytona,
-        patch("haxkday.api.routes.analyze.BraintrustClient") as MockBraintrust,
+        patch("haxkday.pipeline.FireworksClient") as MockFireworks,
+        patch("haxkday.pipeline.SecEdgarClient") as MockSecEdgar,
+        patch("haxkday.pipeline.AlphaVantageClient") as MockAlphaVantage,
+        patch("haxkday.pipeline.DaytonaSandboxClient") as MockDaytona,
+        patch("haxkday.pipeline.BraintrustClient") as MockBraintrust,
     ):
         MockFireworks.return_value.complete = AsyncMock(
             side_effect=[MOCK_PLANNER_RESPONSE, MOCK_MEMO_RESPONSE]

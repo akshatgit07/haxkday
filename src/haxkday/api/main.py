@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from .routes import analyze, voice
+from .routes import analyze, tools, voice
 
 
 def create_app() -> FastAPI:
@@ -12,6 +12,7 @@ def create_app() -> FastAPI:
 
     app.include_router(analyze.router)
     app.include_router(voice.router)
+    app.include_router(tools.router)
 
     return app
 

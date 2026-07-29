@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Voice
     elevenlabs_api_key: str = Field(default="", alias="ELEVENLABS_API_KEY")
     elevenlabs_voice_id: str = Field(default="", alias="ELEVENLABS_VOICE_ID")
+    # Shared secret the ElevenLabs Conversational AI agent sends on every
+    # server-tool webhook call, so /tools/analyze can reject everyone else.
+    elevenlabs_webhook_secret: str = Field(default="", alias="ELEVENLABS_WEBHOOK_SECRET")
 
     # Sandbox
     daytona_api_key: str = Field(default="", alias="DAYTONA_API_KEY")
