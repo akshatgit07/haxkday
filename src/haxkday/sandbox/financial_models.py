@@ -65,3 +65,23 @@ def scenario_analysis(base_case: dict, bull_case: dict, bear_case: dict) -> dict
         name: dcf_fair_value(case["free_cash_flows"], case["discount_rate"], case["terminal_growth_rate"])
         for name, case in (("bull", bull_case), ("base", base_case), ("bear", bear_case))
     }
+
+
+def margin_scenario(
+    revenue: float,
+    total_costs: float,
+    cost_category_amount: float,
+    cost_category_pct_change: float,
+) -> dict:
+    """Net margin impact of one cost category changing, holding revenue and every
+    other cost constant. `cost_category_pct_change` is a fraction (0.08 = +8%)."""
+    cost_delta = cost_category_amount * cost_category_pct_change
+    new_total_costs = total_costs + cost_delta
+    base_margin_pct = (revenue - total_costs) / revenue * 100
+    new_margin_pct = (revenue - new_total_costs) / revenue * 100
+    return {
+        "base_margin_pct": base_margin_pct,
+        "new_margin_pct": new_margin_pct,
+        "margin_delta_pct": new_margin_pct - base_margin_pct,
+        "cost_delta": cost_delta,
+    }

@@ -12,6 +12,7 @@ from ..utils import strip_json_fence
 from .base import Agent
 
 _MAX_FILING_CHARS = 12_000
+_LOW_CONFIDENCE_THRESHOLD = 60.0
 
 _SYSTEM_PROMPT = (
     "You are the Investment Memo Agent for an autonomous financial analyst. "
@@ -28,6 +29,12 @@ _SYSTEM_PROMPT = (
     "aloud (\"four point two billion dollars\", not \"$4.2B\" or "
     "digit-by-digit). Keep bull_case, bear_case, and key_risks to at most "
     "three items each — a voice agent can't usefully read a long list.\n\n"
+    "Sourcing: you're given available_sources (filings actually retrieved) "
+    "and known_data_gaps (data that could not be retrieved). When you draw "
+    "on a filing, cite it by name in executive_summary the way a real "
+    "analyst would (\"According to the Q2 10-Q...\"). Never imply you have "
+    "data you weren't given — if valuation, market, or risk data is null, "
+    "say so plainly rather than guessing.\n\n"
     'Respond with a single JSON object matching exactly this schema: '
     '{"ticker": str, "executive_summary": str, "bull_case": [str], '
     '"bear_case": [str], "key_risks": [str], '
@@ -52,6 +59,9 @@ class InvestmentMemoAgent(Agent):
         valuation: ValuationResult | None = None,
         risk: RiskAssessment | None = None,
     ) -> InvestmentMemo:
+        sources = [f"SEC {f.filing_type}, fiscal period {f.fiscal_period}" for f in filings]
+        data_gaps = _data_gaps(filings, market, valuation, risk)
+
         user_prompt = json.dumps(
             {
                 "ticker": ticker,
@@ -59,10 +69,38 @@ class InvestmentMemoAgent(Agent):
                 "market": market.model_dump() if market else None,
                 "valuation": valuation.model_dump() if valuation else None,
                 "risk": risk.model_dump() if risk else None,
+                "available_sources": sources,
+                "known_data_gaps": data_gaps,
             }
         )
         raw = await self.fireworks.complete(_SYSTEM_PROMPT, user_prompt)
-        return InvestmentMemo.model_validate_json(strip_json_fence(raw))
+        memo = InvestmentMemo.model_validate_json(strip_json_fence(raw))
+
+        if memo.confidence_pct < _LOW_CONFIDENCE_THRESHOLD:
+            data_gaps = [*data_gaps, "Low-confidence estimate"]
+
+        # sources/data_gaps are computed here, deterministically, from what
+        # actually went into the request — never trust the model to
+        # self-report what it was and wasn't given.
+        return memo.model_copy(update={"sources": sources, "data_gaps": data_gaps})
+
+
+def _data_gaps(
+    filings: list[FilingExcerpt],
+    market: MarketSnapshot | None,
+    valuation: ValuationResult | None,
+    risk: RiskAssessment | None,
+) -> list[str]:
+    gaps = []
+    if not filings:
+        gaps.append("No SEC filings on file for this company")
+    if valuation is None or valuation.dcf_fair_value is None:
+        gaps.append("Valuation data unavailable")
+    if market is None:
+        gaps.append("Live market data unavailable")
+    if risk is None:
+        gaps.append("Risk assessment not available")
+    return gaps
 
 
 def _truncate_filing(filing: FilingExcerpt) -> dict:

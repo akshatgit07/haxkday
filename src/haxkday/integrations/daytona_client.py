@@ -3,6 +3,11 @@
 See examples/hello_sandbox.py for the underlying create/run/delete pattern this builds on.
 """
 
+import inspect
+import json
+from collections.abc import Callable
+from typing import Any
+
 from daytona import Daytona, DaytonaConfig
 
 
@@ -21,3 +26,11 @@ class DaytonaSandboxClient:
             return response.result
         finally:
             sandbox.delete()
+
+    def run_function(self, func: Callable[..., Any], *args: Any) -> Any:
+        """Ship a dependency-free function's own source into the sandbox, call it with args,
+        and return the JSON-decoded result. `func` must return a JSON-serializable value."""
+        source = inspect.getsource(func)
+        call_args = ", ".join(repr(a) for a in args)
+        code = f"{source}\nimport json\nresult = {func.__name__}({call_args})\nprint(json.dumps(result))\n"
+        return json.loads(self.run_code(code))

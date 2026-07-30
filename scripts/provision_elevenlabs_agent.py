@@ -1,9 +1,9 @@
 """Provisions the ElevenLabs Conversational AI voice agent for Morgan AI.
 
 Creates an agent that answers financial questions by voice and calls this
-backend's POST /tools/analyze as a server tool whenever the user asks for a
-real investment analysis, sending the shared webhook secret as a static
-header.
+backend's tool webhooks (POST /tools/analyze, POST /tools/scenario) whenever
+the user asks for a real investment analysis or a quick "what if" scenario,
+sending the shared webhook secret as a static header.
 
 Requires MORGAN_BACKEND_URL to be a public HTTPS URL ElevenLabs' servers can
 reach — a localhost/sandbox address won't work. Deploy the FastAPI app
@@ -23,7 +23,9 @@ SYSTEM_PROMPT = (
     "restating what was asked.\n\n"
     "Delivery: lead with the core metric or variance immediately, in your "
     "first sentence. Then stop and let the user ask a follow-up rather than "
-    "continuing to explain unprompted.\n\n"
+    "continuing to explain unprompted. The user can interrupt you mid-"
+    "sentence at any time — if they do, drop what you were saying and "
+    "address what they just asked.\n\n"
     "Numbers: say large sums the way you'd say them aloud — \"four point "
     "two billion dollars,\" never digit-by-digit or reading a dollar sign. "
     "If you have several figures to give, cap it at three at a time; offer "
@@ -33,7 +35,14 @@ SYSTEM_PROMPT = (
     "answering from memory — it runs a real pipeline against SEC filings "
     "and financial data. Lead with the tool's recommendation and "
     "confidence, then the executive summary; don't read the bull/bear "
-    "case or risks as a verbatim list unless asked."
+    "case or risks as a verbatim list unless asked. Always mention the "
+    "source it cites, and say plainly if it flags missing or low-"
+    "confidence data — never smooth that over.\n\n"
+    "When the user asks a quick hypothetical like \"what happens to margin "
+    "if logistics costs rise 8 percent,\" call the model_scenario tool with "
+    "the revenue, total costs, and the specific cost category's current "
+    "amount and percentage change. If you don't have the baseline figures, "
+    "ask for them rather than guessing."
 )
 
 FIRST_MESSAGE = "Morgan. What would you like reviewed?"
@@ -50,6 +59,7 @@ def build_analyze_tool(backend_url: str, webhook_secret: str) -> dict:
             "value, or give an opinion on a specific company."
         ),
         "response_timeout_secs": 30,
+        "interruption_mode": "allow",
         "api_schema": {
             "url": f"{backend_url.rstrip('/')}/tools/analyze",
             "method": "POST",
@@ -76,6 +86,47 @@ def build_analyze_tool(backend_url: str, webhook_secret: str) -> dict:
     }
 
 
+def build_scenario_tool(backend_url: str, webhook_secret: str) -> dict:
+    return {
+        "type": "webhook",
+        "name": "model_scenario",
+        "description": (
+            "Quick 'what if' cost-shock scenario modeling: given current revenue, "
+            "total costs, and one cost category's current amount, computes the net "
+            "margin impact of that category changing by a given percentage. Call "
+            "this for hypothetical questions like 'what happens to margin if "
+            "logistics costs rise 8 percent?'."
+        ),
+        "response_timeout_secs": 15,
+        "interruption_mode": "allow",
+        "api_schema": {
+            "url": f"{backend_url.rstrip('/')}/tools/scenario",
+            "method": "POST",
+            "request_headers": {"X-Webhook-Secret": webhook_secret},
+            "request_body_schema": {
+                "type": "object",
+                "required": ["revenue", "total_costs", "cost_category_amount", "cost_category_pct_change"],
+                "properties": {
+                    "revenue": {"type": "number", "description": "Current total revenue."},
+                    "total_costs": {"type": "number", "description": "Current total costs."},
+                    "cost_category_amount": {
+                        "type": "number",
+                        "description": "Current amount of the specific cost category being shocked.",
+                    },
+                    "cost_category_pct_change": {
+                        "type": "number",
+                        "description": "Fractional change to that category, e.g. 0.08 for +8%, -0.05 for -5%.",
+                    },
+                    "cost_category_label": {
+                        "type": "string",
+                        "description": "Name of the cost category, e.g. 'logistics costs'.",
+                    },
+                },
+            },
+        },
+    }
+
+
 def build_conversation_config(backend_url: str, webhook_secret: str, voice_id: str) -> dict:
     config: dict = {
         "agent": {
@@ -83,8 +134,17 @@ def build_conversation_config(backend_url: str, webhook_secret: str, voice_id: s
             "language": "en",
             "prompt": {
                 "prompt": SYSTEM_PROMPT,
-                "tools": [build_analyze_tool(backend_url, webhook_secret)],
+                "tools": [
+                    build_analyze_tool(backend_url, webhook_secret),
+                    build_scenario_tool(backend_url, webhook_secret),
+                ],
             },
+        },
+        "turn": {
+            # Barge-in: users can interrupt mid-sentence. These are brief spoken
+            # acknowledgments that shouldn't themselves be treated as an
+            # interruption (the user is just signaling they're listening).
+            "interruption_ignore_terms": ["mmhmm", "uh huh", "okay", "yeah", "right", "got it"],
         },
     }
     if voice_id:

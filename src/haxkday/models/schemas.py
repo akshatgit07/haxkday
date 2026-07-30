@@ -73,3 +73,17 @@ class InvestmentMemo(BaseModel):
     key_risks: list[str]
     recommendation: Literal["BUY", "HOLD", "SELL"]
     confidence_pct: float
+    # Computed deterministically from what data actually went into this memo —
+    # never trust the model to self-report what it was and wasn't given.
+    sources: list[str] = []
+    data_gaps: list[str] = []
+
+
+class ScenarioRequest(BaseModel):
+    """A hypothetical cost-shock question, e.g. "what if logistics costs rise 8%?"."""
+
+    revenue: float
+    total_costs: float
+    cost_category_amount: float
+    cost_category_pct_change: float
+    cost_category_label: str = "the specified cost category"

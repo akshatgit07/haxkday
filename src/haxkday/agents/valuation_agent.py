@@ -1,6 +1,4 @@
 import asyncio
-import inspect
-import json
 
 from ..integrations.alpha_vantage_client import AlphaVantageClient
 from ..integrations.daytona_client import DaytonaSandboxClient
@@ -38,18 +36,11 @@ class ValuationAgent(Agent):
             financials.free_cash_flow * (1 + growth_rate) ** year for year in range(1, _PROJECTION_YEARS + 1)
         ]
 
-        code = _build_dcf_snippet(projected_fcfs, _DEFAULT_DISCOUNT_RATE, _DEFAULT_TERMINAL_GROWTH_RATE)
-        raw = await asyncio.to_thread(self.daytona.run_code, code)
-        fair_value = json.loads(raw)["dcf_fair_value"]
-
+        fair_value = await asyncio.to_thread(
+            self.daytona.run_function,
+            financial_models.dcf_fair_value,
+            projected_fcfs,
+            _DEFAULT_DISCOUNT_RATE,
+            _DEFAULT_TERMINAL_GROWTH_RATE,
+        )
         return ValuationResult(dcf_fair_value=fair_value)
-
-
-def _build_dcf_snippet(free_cash_flows: list[float], discount_rate: float, terminal_growth_rate: float) -> str:
-    source = inspect.getsource(financial_models.dcf_fair_value)
-    return (
-        f"{source}\n"
-        "import json\n"
-        f"result = dcf_fair_value({free_cash_flows!r}, {discount_rate!r}, {terminal_growth_rate!r})\n"
-        "print(json.dumps({'dcf_fair_value': result}))\n"
-    )
