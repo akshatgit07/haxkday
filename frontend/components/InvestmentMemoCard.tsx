@@ -70,6 +70,21 @@ export default function InvestmentMemoCard({ memo }: { memo: InvestmentMemo }) {
             ))}
           </div>
         </div>
+
+        {(memo.sources.length > 0 || memo.data_gaps.length > 0) && (
+          <div className="space-y-1 border-t border-neutral-200 pt-4 text-xs dark:border-neutral-800">
+            {memo.sources.map((source) => (
+              <p key={source} className="text-neutral-500 dark:text-neutral-400">
+                Source: {source}
+              </p>
+            ))}
+            {memo.data_gaps.map((gap) => (
+              <p key={gap} className="text-amber-600 dark:text-amber-500">
+                Note: {gap}
+              </p>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

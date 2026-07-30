@@ -14,4 +14,13 @@ export interface InvestmentMemo {
   key_risks: string[];
   recommendation: Recommendation;
   confidence_pct: number;
+  sources: string[];
+  data_gaps: string[];
+}
+
+export interface ScenarioResult {
+  base_margin_pct: number;
+  new_margin_pct: number;
+  margin_delta_pct: number;
+  cost_delta: number;
 }

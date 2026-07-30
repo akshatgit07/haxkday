@@ -166,6 +166,8 @@ def main() -> None:
         conversation_config=conversation_config,
     )
     print(f"Created agent: {response.agent_id}")
+    print(f"\nSet ELEVENLABS_AGENT_ID={response.agent_id} in the backend's environment")
+    print("(needed by GET /voice/session, which the frontend uses to start a live conversation)")
 
 
 if __name__ == "__main__":

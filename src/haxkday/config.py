@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     # Shared secret the ElevenLabs Conversational AI agent sends on every
     # server-tool webhook call, so /tools/analyze can reject everyone else.
     elevenlabs_webhook_secret: str = Field(default="", alias="ELEVENLABS_WEBHOOK_SECRET")
+    # Printed by scripts/provision_elevenlabs_agent.py after creating the agent.
+    elevenlabs_agent_id: str = Field(default="", alias="ELEVENLABS_AGENT_ID")
 
     # Sandbox
     daytona_api_key: str = Field(default="", alias="DAYTONA_API_KEY")
