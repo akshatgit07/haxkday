@@ -1,10 +1,11 @@
-"""The core Planner -> Research -> Valuation -> Memo pipeline, shared by every
-entry point that can trigger an analysis (the /analyze HTTP route, the
-/tools/analyze webhook the ElevenLabs voice agent calls, etc.).
+"""The core Planner -> Research -> Market -> Valuation -> Memo pipeline, shared
+by every entry point that can trigger an analysis (the /analyze HTTP route,
+the /tools/analyze webhook the ElevenLabs voice agent calls, etc.).
 """
 
 import httpx
 
+from .agents.market_data_agent import MarketDataAgent
 from .agents.memo_agent import InvestmentMemoAgent
 from .agents.planner import PlannerAgent
 from .agents.research_agent import ResearchAgent
@@ -14,17 +15,18 @@ from .integrations.alpha_vantage_client import AlphaVantageClient
 from .integrations.braintrust_client import BraintrustClient
 from .integrations.daytona_client import DaytonaSandboxClient
 from .integrations.fireworks_client import FireworksClient
+from .integrations.polygon_client import PolygonClient
 from .integrations.sec_edgar_client import SecEdgarClient
-from .models.schemas import AnalysisRequest, FilingExcerpt, InvestmentMemo, ValuationResult
+from .models.schemas import AnalysisRequest, FilingExcerpt, InvestmentMemo, MarketSnapshot, ValuationResult
 
 
 async def run_analysis(request: AnalysisRequest, settings: Settings) -> InvestmentMemo:
     """Run the pipeline for a request, tracing every step to Braintrust.
 
-    Research pulls real 10-K/10-Q filings from SEC EDGAR, and Valuation runs a
-    real DCF (inside Daytona) on fundamentals pulled from Alpha Vantage, when a
-    ticker is given. Market/Risk agents aren't wired to live data sources yet
-    (Polygon/FMP keys still missing), so those fields stay null.
+    Research pulls real 10-K/10-Q filings from SEC EDGAR, Market pulls a real
+    price/market-cap/news snapshot from Polygon, and Valuation runs a real DCF
+    (inside Daytona) on fundamentals pulled from Alpha Vantage, when a ticker
+    is given. The Risk agent isn't wired to a live data source yet.
     """
     braintrust = BraintrustClient(api_key=settings.braintrust_api_key, project=settings.braintrust_project)
     trace_id = braintrust.start_trace("analyze")
@@ -37,6 +39,7 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         braintrust.log_span(trace_id, name="planner", input={"query": request.query}, output={"tasks": tasks})
 
         filings: list[FilingExcerpt] = []
+        market: MarketSnapshot | None = None
         valuation: ValuationResult | None = None
         if request.ticker:
             research = ResearchAgent(SecEdgarClient(user_agent=settings.sec_edgar_user_agent))
@@ -47,6 +50,18 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
                 input={"ticker": request.ticker},
                 output={"filing_types": [f.filing_type for f in filings]},
             )
+
+            market_agent = MarketDataAgent(PolygonClient(api_key=settings.polygon_api_key))
+            try:
+                market = await market_agent.run(request.ticker)
+            except (httpx.HTTPError, ValueError) as exc:
+                braintrust.log_span(
+                    trace_id, name="market", input={"ticker": request.ticker}, output={"error": str(exc)}
+                )
+            else:
+                braintrust.log_span(
+                    trace_id, name="market", input={"ticker": request.ticker}, output=market.model_dump()
+                )
 
             valuation_agent = ValuationAgent(
                 AlphaVantageClient(api_key=settings.alpha_vantage_api_key),
@@ -66,7 +81,7 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
 
         ticker = request.ticker or request.company_name or request.query
         memo_agent = InvestmentMemoAgent(fireworks)
-        memo = await memo_agent.run(ticker=ticker, filings=filings, valuation=valuation)
+        memo = await memo_agent.run(ticker=ticker, filings=filings, market=market, valuation=valuation)
         braintrust.log_span(trace_id, name="memo", input={"ticker": ticker}, output=memo.model_dump())
 
         braintrust.score(trace_id, confidence=memo.confidence_pct / 100)

@@ -1,13 +1,13 @@
 """End-to-end demo of the /analyze pipeline through the real FastAPI app.
 
 Everything is real (routing, request validation, Planner -> Research ->
-Valuation -> Memo agent orchestration, JSON parsing, Pydantic response
-validation, Braintrust trace-step sequencing) except the network calls
-themselves (Fireworks, SEC EDGAR, Alpha Vantage, Daytona, Braintrust),
-which are mocked here. Use this to see the pipeline work when live
-outbound access isn't available (e.g. inside a network-restricted
+Market -> Valuation -> Memo agent orchestration, JSON parsing, Pydantic
+response validation, Braintrust trace-step sequencing) except the network
+calls themselves (Fireworks, SEC EDGAR, Polygon, Alpha Vantage, Daytona,
+Braintrust), which are mocked here. Use this to see the pipeline work when
+live outbound access isn't available (e.g. inside a network-restricted
 sandbox); with real network access, drop the `patch(...)` calls and it
-hits all five APIs for real.
+hits all six APIs for real.
 """
 
 import asyncio
@@ -17,7 +17,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 
 from haxkday.api.main import app
-from haxkday.models.schemas import FilingExcerpt, FinancialSnapshot
+from haxkday.models.schemas import FilingExcerpt, FinancialSnapshot, MarketSnapshot
+
+MOCK_MARKET = MarketSnapshot(
+    ticker="NVDA",
+    price=180.5,
+    market_cap=4_400_000_000_000.0,
+    recent_news=["NVIDIA shares hit record high on AI demand"],
+)
 
 MOCK_FINANCIALS = FinancialSnapshot(
     ticker="NVDA",
@@ -80,6 +87,7 @@ async def main() -> None:
     with (
         patch("haxkday.pipeline.FireworksClient") as MockFireworks,
         patch("haxkday.pipeline.SecEdgarClient") as MockSecEdgar,
+        patch("haxkday.pipeline.PolygonClient") as MockPolygon,
         patch("haxkday.pipeline.AlphaVantageClient") as MockAlphaVantage,
         patch("haxkday.pipeline.DaytonaSandboxClient") as MockDaytona,
         patch("haxkday.pipeline.BraintrustClient") as MockBraintrust,
@@ -90,6 +98,7 @@ async def main() -> None:
         MockSecEdgar.return_value.get_latest_filing = AsyncMock(
             side_effect=[MOCK_10K, ValueError("no 10-Q on file")]
         )
+        MockPolygon.return_value.get_market_snapshot = AsyncMock(return_value=MOCK_MARKET)
         MockAlphaVantage.return_value.get_financial_snapshot = AsyncMock(return_value=MOCK_FINANCIALS)
         MockDaytona.return_value.run_code = MagicMock(return_value=json.dumps({"dcf_fair_value": 987654.32}))
 
