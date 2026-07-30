@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from ..config import get_settings
 from .routes import analyze, tools, voice
 
 
@@ -9,7 +10,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000"],
+        allow_origins=get_settings().cors_allowed_origins_list,
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )

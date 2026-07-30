@@ -1,0 +1,12 @@
+.git
+.env
+.env.example
+frontend
+examples
+scripts
+tests
+README.md
+__pycache__
+*.egg-info
+.venv
+venv
