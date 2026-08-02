@@ -16,6 +16,8 @@ services:
         sync: false
       - key: ELEVENLABS_WEBHOOK_SECRET
         sync: false
+      - key: ELEVENLABS_AGENT_ID
+        sync: false
       - key: DAYTONA_API_KEY
         sync: false
       - key: BRAINTRUST_API_KEY
