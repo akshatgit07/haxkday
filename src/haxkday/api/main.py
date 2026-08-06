@@ -19,6 +19,15 @@ def create_app() -> FastAPI:
     async def health() -> dict:
         return {"status": "ok"}
 
+    @app.get("/")
+    async def root() -> dict:
+        return {
+            "name": "Morgan AI",
+            "docs": "/docs",
+            "health": "/health",
+            "endpoints": ["/analyze", "/tools/analyze", "/tools/scenario", "/voice/session"],
+        }
+
     app.include_router(analyze.router)
     app.include_router(voice.router)
     app.include_router(tools.router)
