@@ -125,7 +125,7 @@ export default function AnalystScreen() {
 
   return (
     <div
-      className="voice-analyst-theme"
+      className="organic-theme"
       style={{
         height: "100%",
         display: "flex",
