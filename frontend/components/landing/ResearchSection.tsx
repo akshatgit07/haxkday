@@ -1,5 +1,6 @@
 import SectionHeader from "./SectionHeader";
 import ResearchMockup from "./ResearchMockup";
+import TwoColumnFeatures from "./TwoColumnFeatures";
 
 export default function ResearchSection() {
   return (
@@ -25,6 +26,7 @@ export default function ResearchSection() {
         <div className="mt-10">
           <ResearchMockup />
         </div>
+        <TwoColumnFeatures />
       </div>
     </section>
   );

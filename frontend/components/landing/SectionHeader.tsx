@@ -27,7 +27,7 @@ export default function SectionHeader({
     <div className="grid gap-6 sm:grid-cols-[7fr_5fr] sm:items-end">
       <div>
         <p className="eyebrow" style={{ color: eyebrowColor }}>
-          {number} · {label}
+          {number === "—" ? label : `${number} · ${label}`}
         </p>
         <h2 className="display mt-4 max-w-md text-[32px] sm:text-[40px]" style={{ color: headlineColor }}>
           {headline}
