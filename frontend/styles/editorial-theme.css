@@ -1,0 +1,90 @@
+/* Morgan editorial theme — the landing page's own identity: warm dark ink
+   instead of navy, terracotta/olive accents (continuing the Organic system's
+   palette) instead of lime green, Fraunces for display type. Scoped to
+   .editorial-theme so it doesn't affect /voice or /app. */
+
+.editorial-theme {
+  --ink-950: #17130f;
+  --ink-900: #211a13;
+  --ink-800: #2c231a;
+  --ink-line: rgba(246, 239, 226, 0.14);
+  --ink-text: #f6efe2;
+  --ink-text-muted: rgba(246, 239, 226, 0.62);
+
+  --cream: #f5ead8;
+  --cream-raised: #fbf6ec;
+  --cream-line: rgba(23, 19, 15, 0.12);
+  --cream-text: #1c1712;
+  --cream-text-muted: rgba(28, 23, 18, 0.62);
+
+  --mint: #e7ede0;
+  --mint-raised: #f3f7ee;
+  --mint-line: rgba(23, 19, 15, 0.1);
+
+  --accent: #c67139;
+  --accent-bright: #e08a4f;
+  --accent-ink: #f8dcc4;
+  --accent-2: #7a8a5e;
+  --accent-2-bright: #9db178;
+  --accent-2-ink: #263019;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-figtree), system-ui, sans-serif;
+
+  font-family: var(--font-body);
+}
+
+.editorial-theme .eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.editorial-theme .display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.06;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.editorial-theme .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.editorial-theme .btn-accent {
+  background: var(--accent);
+  color: #fffaf3;
+}
+.editorial-theme .btn-accent:hover {
+  background: var(--accent-bright);
+}
+.editorial-theme .btn-outline-dark {
+  border-color: var(--ink-line);
+  color: var(--ink-text);
+}
+.editorial-theme .btn-outline-dark:hover {
+  background: rgba(246, 239, 226, 0.08);
+}
+.editorial-theme .btn-outline-light {
+  border-color: var(--cream-line);
+  color: var(--cream-text);
+}
+.editorial-theme .btn-outline-light:hover {
+  background: rgba(23, 19, 15, 0.05);
+}

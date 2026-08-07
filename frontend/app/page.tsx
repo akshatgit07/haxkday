@@ -1,28 +1,27 @@
 import NavBar from "@/components/landing/NavBar";
 import Hero from "@/components/landing/Hero";
-import AuditableSection from "@/components/landing/AuditableSection";
-import TwoColumnFeatures from "@/components/landing/TwoColumnFeatures";
-import CapabilitiesTabs from "@/components/landing/CapabilitiesTabs";
-import DataSources from "@/components/landing/DataSources";
-import SecuritySection from "@/components/landing/SecuritySection";
+import AudienceStrip from "@/components/landing/AudienceStrip";
+import ResearchSection from "@/components/landing/ResearchSection";
+import InterfaceSection from "@/components/landing/InterfaceSection";
+import TrustSection from "@/components/landing/TrustSection";
+import EvidenceSection from "@/components/landing/EvidenceSection";
+import MethodologySection from "@/components/landing/MethodologySection";
 import FinalCTA from "@/components/landing/FinalCTA";
 import Footer from "@/components/landing/Footer";
-import { caprasimo, figtree } from "@/lib/fonts";
-import "@/styles/organic-theme.css";
+import { figtree, fraunces } from "@/lib/fonts";
+import "@/styles/editorial-theme.css";
 
 export default function LandingPage() {
   return (
-    <div
-      className={`organic-theme ${caprasimo.variable} ${figtree.variable}`}
-      style={{ background: "var(--color-bg)", minHeight: "100vh" }}
-    >
+    <div className={`editorial-theme ${fraunces.variable} ${figtree.variable}`}>
       <NavBar />
       <Hero />
-      <AuditableSection />
-      <TwoColumnFeatures />
-      <CapabilitiesTabs />
-      <DataSources />
-      <SecuritySection />
+      <AudienceStrip />
+      <ResearchSection />
+      <InterfaceSection />
+      <TrustSection />
+      <EvidenceSection />
+      <MethodologySection />
       <FinalCTA />
       <Footer />
     </div>
