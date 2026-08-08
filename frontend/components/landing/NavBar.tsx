@@ -23,8 +23,8 @@ export default function NavBar() {
           Enterprise
         </Link>
       </nav>
-      <Link href="/app" className="btn btn-outline-light text-[12px]">
-        Request Access
+      <Link href="/voice/live" className="btn btn-outline-light text-[12px]">
+        Try the live demo
       </Link>
     </header>
   );

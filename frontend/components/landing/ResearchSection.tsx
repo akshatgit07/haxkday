@@ -19,7 +19,7 @@ export default function ResearchSection() {
           headlineColor="var(--cream-text)"
           description="Ask the question in plain language. Morgan reads the filing, runs the valuation, and cites where every number came from."
           descriptionColor="var(--cream-text-muted)"
-          linkHref="/app"
+          linkHref="/voice/live"
           linkLabel="Try the reasoning layer"
           linkColor="var(--accent)"
         />
