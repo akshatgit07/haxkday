@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import HeroGlow from "./HeroGlow";
 
 export default function Hero() {
@@ -23,9 +25,9 @@ export default function Hero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-4">
-            <a href="#access" className="btn btn-accent">
-              Request Access
-            </a>
+            <Link href="/voice/live" className="btn btn-accent">
+              Try the live demo
+            </Link>
             <a href="#capabilities" className="btn btn-outline-dark">
               See how it works
             </a>
