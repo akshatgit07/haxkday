@@ -3,6 +3,7 @@ import asyncio
 from fastapi import APIRouter, Header, HTTPException
 
 from ...config import Settings, get_settings
+from ...integrations.braintrust_client import BraintrustClient
 from ...integrations.daytona_client import DaytonaSandboxClient
 from ...models.schemas import AnalysisRequest, ScenarioRequest
 from ...pipeline import run_analysis
@@ -62,15 +63,31 @@ async def scenario_tool(
     settings = get_settings()
     _require_webhook_secret(settings, x_webhook_secret)
 
+    braintrust = BraintrustClient(api_key=settings.braintrust_api_key, project=settings.braintrust_project)
+    trace_id = braintrust.start_trace("scenario")
+
     daytona = DaytonaSandboxClient(api_key=settings.daytona_api_key)
-    result = await asyncio.to_thread(
-        daytona.run_function,
-        financial_models.margin_scenario,
-        request.revenue,
-        request.total_costs,
-        request.cost_category_amount,
-        request.cost_category_pct_change,
-    )
+    try:
+        result = await asyncio.to_thread(
+            daytona.run_function,
+            financial_models.margin_scenario,
+            request.revenue,
+            request.total_costs,
+            request.cost_category_amount,
+            request.cost_category_pct_change,
+        )
+    except Exception as exc:
+        braintrust.log_span(
+            trace_id,
+            name="margin_scenario",
+            input=request.model_dump(),
+            output={"error": str(exc)},
+        )
+        braintrust.end_trace(trace_id)
+        raise
+    braintrust.log_span(trace_id, name="margin_scenario", input=request.model_dump(), output=result)
+    # Deterministic Daytona math, not a model judgment — nothing to score for confidence.
+    braintrust.end_trace(trace_id)
 
     direction = "increases" if request.cost_category_pct_change >= 0 else "decreases"
     pct = abs(request.cost_category_pct_change) * 100

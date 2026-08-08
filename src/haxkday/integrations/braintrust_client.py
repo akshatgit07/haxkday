@@ -26,6 +26,12 @@ class BraintrustClient:
         with parent.start_span(name=name) as child:
             child.log(input=input, output=output, metadata=metadata or {})
 
+    def end_trace(self, trace_id: str) -> None:
+        """Close a trace that has no meaningful confidence score to attach —
+        e.g. a deterministic calculation rather than a model judgment."""
+        span = self._spans.pop(trace_id)
+        span.end()
+
     def score(self, trace_id: str, confidence: float, hallucination_score: float | None = None) -> None:
         """Attach evaluation scores to a completed trace, then close it.
 
