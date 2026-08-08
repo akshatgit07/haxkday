@@ -3,10 +3,12 @@
 import { useCallback, useState } from "react";
 import { useConversation } from "@elevenlabs/react";
 
-import InvestmentMemoCard from "@/components/InvestmentMemoCard";
 import { getSignedConversationUrl, VoiceSessionError } from "@/lib/voiceSession";
-import type { InvestmentMemo, ScenarioResult } from "@/lib/types";
+import type { InvestmentMemo, ScenarioInputs, ScenarioResult } from "@/lib/types";
+import { caprasimo, figtree } from "@/lib/fonts";
+import "@/styles/organic-theme.css";
 
+import LiveMemoCard from "./LiveMemoCard";
 import ScenarioResultCard from "./ScenarioResultCard";
 
 interface ToolActivity {
@@ -14,16 +16,35 @@ interface ToolActivity {
   status: "calling" | "done" | "error";
 }
 
+interface ScenarioState {
+  result: ScenarioResult;
+  inputs: ScenarioInputs | null;
+  summary: string;
+}
+
 const TOOL_LABELS: Record<string, string> = {
   analyze_company: "Analyzing",
   model_scenario: "Modeling scenario",
 };
 
+const NEUTRAL_700 = "var(--color-neutral-700, #6b6560)";
+const ACCENT_700 = "var(--color-accent-700, #8a4b25)";
+
+function MicIcon() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+      <rect x="9" y="2" width="6" height="12" rx="3" stroke="#fff" strokeWidth="2.2" />
+      <path d="M5 11a7 7 0 0 0 14 0" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+      <line x1="12" y1="18" x2="12" y2="22" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function LiveCompanion() {
   const [error, setError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ToolActivity | null>(null);
   const [memo, setMemo] = useState<InvestmentMemo | null>(null);
-  const [scenario, setScenario] = useState<{ result: ScenarioResult; summary: string } | null>(null);
+  const [scenario, setScenario] = useState<ScenarioState | null>(null);
 
   const conversation = useConversation({
     onError: (err) => setError(typeof err === "string" ? err : "Connection error"),
@@ -42,7 +63,11 @@ export default function LiveCompanion() {
           setMemo(parsed.memo as InvestmentMemo);
           setScenario(null);
         } else if (res.tool_name === "model_scenario" && parsed.result) {
-          setScenario({ result: parsed.result as ScenarioResult, summary: parsed.summary as string });
+          setScenario({
+            result: parsed.result as ScenarioResult,
+            inputs: (parsed.inputs as ScenarioInputs) ?? null,
+            summary: parsed.summary as string,
+          });
           setMemo(null);
         }
       } catch {
@@ -53,6 +78,7 @@ export default function LiveCompanion() {
   });
 
   const connected = conversation.status === "connected";
+  const speaking = conversation.isSpeaking;
 
   const startCall = useCallback(async () => {
     setError(null);
@@ -71,61 +97,123 @@ export default function LiveCompanion() {
   }, [conversation]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center gap-6 p-8">
-      <div className="text-center">
-        <h1 className="text-2xl font-semibold">Morgan AI — Live</h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Talk to your analyst. Charts and filings sync here as they're mentioned.
-        </p>
-      </div>
-
-      {!connected ? (
-        <button
-          onClick={startCall}
-          className="rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900"
-        >
-          Start conversation
-        </button>
-      ) : (
-        <div className="flex items-center gap-3">
-          <span
-            className={`flex items-center gap-2 rounded-full border border-neutral-200 px-3 py-1.5 text-sm dark:border-neutral-800 ${
-              conversation.isSpeaking ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-500"
-            }`}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${conversation.isSpeaking ? "bg-emerald-500" : "bg-neutral-400"}`}
-            />
-            {conversation.isSpeaking ? "Speaking" : "Listening"}
-          </span>
-          <button
-            onClick={endCall}
-            className="rounded-lg border border-neutral-300 px-4 py-1.5 text-sm dark:border-neutral-700"
-          >
-            End call
-          </button>
+    <div
+      className={`organic-theme ${caprasimo.variable} ${figtree.variable}`}
+      style={{ minHeight: "100vh", background: "var(--color-bg)" }}
+    >
+      <main
+        style={{
+          maxWidth: 720,
+          margin: "0 auto",
+          padding: "56px 20px 90px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 26,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <h1 style={{ fontFamily: "var(--font-heading)", fontSize: 30, color: "var(--color-text)", margin: 0 }}>
+            Morgan AI — Live
+          </h1>
+          <p className="text-muted" style={{ marginTop: 8, fontSize: 14 }}>
+            Talk to your analyst. Numbers, citations, and the math sync here as Morgan answers.
+          </p>
         </div>
-      )}
 
-      {error && (
-        <p className="w-full max-w-lg rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-400">
-          {error}
-        </p>
-      )}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <div
+            onClick={connected ? undefined : startCall}
+            style={{
+              width: 100,
+              height: 100,
+              borderRadius: "50%",
+              background: "var(--color-accent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: connected ? "default" : "pointer",
+              animation: connected
+                ? speaking
+                  ? "orbBreathe 1.4s ease-in-out infinite"
+                  : "orbPulseRing 1.6s ease-out infinite"
+                : "none",
+            }}
+          >
+            <div
+              style={{
+                width: 76,
+                height: 76,
+                borderRadius: "50%",
+                background: ACCENT_700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <MicIcon />
+            </div>
+          </div>
 
-      {activity && activity.status === "calling" && (
-        <p className="text-sm text-neutral-500">
-          {TOOL_LABELS[activity.toolName] ?? activity.toolName}…
-        </p>
-      )}
-      {activity && activity.status === "error" && (
-        <p className="text-sm text-rose-600 dark:text-rose-400">
-          {TOOL_LABELS[activity.toolName] ?? activity.toolName} failed.
-        </p>
-      )}
+          {!connected ? (
+            <button onClick={startCall} className="btn btn-primary">
+              Start conversation
+            </button>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                className="btn btn-secondary"
+                style={{ cursor: "default", color: speaking ? ACCENT_700 : NEUTRAL_700 }}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: speaking ? ACCENT_700 : "var(--color-neutral-400, #c0b6a5)",
+                  }}
+                />
+                {speaking ? "Speaking" : "Listening"}
+              </span>
+              <button onClick={endCall} className="btn btn-secondary">
+                End call
+              </button>
+            </div>
+          )}
+        </div>
 
-      {memo && <InvestmentMemoCard memo={memo} />}
-      {scenario && <ScenarioResultCard result={scenario.result} summary={scenario.summary} />}
-    </main>
+        {error && (
+          <p
+            style={{
+              width: "100%",
+              maxWidth: 560,
+              borderRadius: 12,
+              border: "1px solid var(--color-accent-300, #ffc6a5)",
+              background: "var(--color-accent-100, #fff2eb)",
+              color: ACCENT_700,
+              padding: "10px 14px",
+              fontSize: 13.5,
+              margin: 0,
+            }}
+          >
+            {error}
+          </p>
+        )}
+
+        {activity && activity.status === "calling" && (
+          <p style={{ fontSize: 13.5, color: NEUTRAL_700, margin: 0 }}>
+            {TOOL_LABELS[activity.toolName] ?? activity.toolName}…
+          </p>
+        )}
+        {activity && activity.status === "error" && (
+          <p style={{ fontSize: 13.5, color: ACCENT_700, margin: 0 }}>
+            {TOOL_LABELS[activity.toolName] ?? activity.toolName} failed.
+          </p>
+        )}
+
+        {memo && <LiveMemoCard memo={memo} />}
+        {scenario && <ScenarioResultCard result={scenario.result} inputs={scenario.inputs} summary={scenario.summary} />}
+      </main>
+    </div>
   );
 }

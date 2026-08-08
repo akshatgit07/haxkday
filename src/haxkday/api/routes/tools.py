@@ -75,9 +75,20 @@ async def scenario_tool(
     direction = "increases" if request.cost_category_pct_change >= 0 else "decreases"
     pct = abs(request.cost_category_pct_change) * 100
     trend = "a decline" if result["margin_delta_pct"] < 0 else "an improvement"
+    cost_delta = result["cost_delta"]
+    new_total_costs = request.total_costs + cost_delta
     summary = (
-        f"If {request.cost_category_label} {direction} {pct:.0f} percent, net margin moves from "
-        f"{result['base_margin_pct']:.1f} percent to {result['new_margin_pct']:.1f} percent — "
-        f"{trend} of {abs(result['margin_delta_pct']):.1f} points."
+        f"If {request.cost_category_label} {direction} {pct:.0f} percent, that's a "
+        f"{'cost increase' if cost_delta >= 0 else 'cost decrease'} of ${abs(cost_delta):,.0f}, moving total costs "
+        f"to ${new_total_costs:,.0f}. Net margin moves from {result['base_margin_pct']:.1f} percent to "
+        f"{result['new_margin_pct']:.1f} percent — {trend} of {abs(result['margin_delta_pct']):.1f} points."
     )
-    return {"summary": summary, "result": result}
+    inputs = {
+        "revenue": request.revenue,
+        "total_costs": request.total_costs,
+        "cost_category_label": request.cost_category_label,
+        "cost_category_amount": request.cost_category_amount,
+        "cost_category_pct_change": request.cost_category_pct_change,
+        "new_total_costs": new_total_costs,
+    }
+    return {"summary": summary, "result": result, "inputs": inputs}

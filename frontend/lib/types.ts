@@ -24,3 +24,12 @@ export interface ScenarioResult {
   margin_delta_pct: number;
   cost_delta: number;
 }
+
+export interface ScenarioInputs {
+  revenue: number;
+  total_costs: number;
+  cost_category_label: string;
+  cost_category_amount: number;
+  cost_category_pct_change: number;
+  new_total_costs: number;
+}
