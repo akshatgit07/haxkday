@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import get_settings
+from ..memory import store as memory_store
 from .routes import analyze, tools, voice
 
 
@@ -17,7 +18,7 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
-        return {"status": "ok"}
+        return {"status": "ok", "memory": "on" if memory_store.enabled() else "off"}
 
     @app.get("/")
     async def root() -> dict:
@@ -25,8 +26,18 @@ def create_app() -> FastAPI:
             "name": "Morgan AI",
             "docs": "/docs",
             "health": "/health",
-            "endpoints": ["/analyze", "/tools/analyze", "/tools/scenario", "/voice/session"],
+            "endpoints": [
+                "/analyze",
+                "/tools/analyze",
+                "/tools/recall",
+                "/tools/scenario",
+                "/voice/session",
+            ],
         }
+
+    @app.on_event("shutdown")
+    async def _shutdown() -> None:
+        await memory_store.close()
 
     app.include_router(analyze.router)
     app.include_router(voice.router)

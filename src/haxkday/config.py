@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     braintrust_api_key: str = Field(default="", alias="BRAINTRUST_API_KEY")
     braintrust_project: str = Field(default="morgan-ai", alias="BRAINTRUST_PROJECT")
 
+    # Memory (MongoDB Atlas + Voyage) — short-term turn log + long-term vector recall
+    mongodb_uri: str = Field(default="", alias="MONGODB_URI")
+    mongodb_db: str = Field(default="morgan_ai", alias="MONGODB_DB")
+    voyage_api_key: str = Field(default="", alias="VOYAGE_API_KEY")
+    embedding_model: str = Field(default="voyage-finance-2", alias="EMBEDDING_MODEL")
+    embedding_dimensions: int = Field(default=1024, alias="EMBEDDING_DIMENSIONS")
+    memory_turn_window: int = Field(default=8, alias="MEMORY_TURN_WINDOW")
+    memory_recall_k: int = Field(default=4, alias="MEMORY_RECALL_K")
+    memory_min_score: float = Field(default=0.55, alias="MEMORY_MIN_SCORE")
+    memory_ttl_seconds: int = Field(default=86400, alias="MEMORY_TTL_SECONDS")
+
     # Market / filing data
     sec_edgar_user_agent: str = Field(default="", alias="SEC_EDGAR_USER_AGENT")
     alpha_vantage_api_key: str = Field(default="", alias="ALPHA_VANTAGE_API_KEY")

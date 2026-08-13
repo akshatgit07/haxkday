@@ -35,6 +35,11 @@ _SYSTEM_PROMPT = (
     "analyst would (\"According to the Q2 10-Q...\"). Never imply you have "
     "data you weren't given — if valuation, market, or risk data is null, "
     "say so plainly rather than guessing.\n\n"
+    "Continuity: if conversation_context includes a prior analysis of this "
+    "same ticker for this user, reference it only when the view has clearly "
+    "changed (\"this raises confidence from the prior hold\") — never "
+    "reference prior analysis that wasn't given, and never treat it as a "
+    "reason to omit current sourcing.\n\n"
     'Respond with a single JSON object matching exactly this schema: '
     '{"ticker": str, "executive_summary": str, "bull_case": [str], '
     '"bear_case": [str], "key_risks": [str], '
@@ -58,6 +63,7 @@ class InvestmentMemoAgent(Agent):
         market: MarketSnapshot | None = None,
         valuation: ValuationResult | None = None,
         risk: RiskAssessment | None = None,
+        context: str = "",
     ) -> InvestmentMemo:
         sources = [f"SEC {f.filing_type}, fiscal period {f.fiscal_period}" for f in filings]
         data_gaps = _data_gaps(filings, market, valuation, risk)
@@ -71,6 +77,7 @@ class InvestmentMemoAgent(Agent):
                 "risk": risk.model_dump() if risk else None,
                 "available_sources": sources,
                 "known_data_gaps": data_gaps,
+                "conversation_context": context or None,
             }
         )
         raw = await self.fireworks.complete(_SYSTEM_PROMPT, user_prompt)

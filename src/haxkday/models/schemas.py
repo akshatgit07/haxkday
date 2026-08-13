@@ -9,6 +9,18 @@ class AnalysisRequest(BaseModel):
     query: str
     ticker: str | None = None
     company_name: str | None = None
+    # Identify the conversation/user so the memory layer can recall and
+    # persist context. Defaults keep every existing caller working unchanged.
+    session_id: str = "adhoc"
+    user_id: str = "demo"
+
+
+class RecallRequest(BaseModel):
+    """A pure memory lookup — no analysis pipeline behind it."""
+
+    query: str
+    session_id: str = "adhoc"
+    user_id: str = "demo"
 
 
 class FilingExcerpt(BaseModel):

@@ -3,6 +3,8 @@ by every entry point that can trigger an analysis (the /analyze HTTP route,
 the /tools/analyze webhook the ElevenLabs voice agent calls, etc.).
 """
 
+import asyncio
+
 import httpx
 
 from .agents.market_data_agent import MarketDataAgent
@@ -17,6 +19,7 @@ from .integrations.daytona_client import DaytonaSandboxClient
 from .integrations.fireworks_client import FireworksClient
 from .integrations.polygon_client import PolygonClient
 from .integrations.sec_edgar_client import SecEdgarClient
+from .memory import format_for_prompt, recall_context, remember_analysis, remember_turn
 from .models.schemas import AnalysisRequest, FilingExcerpt, InvestmentMemo, MarketSnapshot, ValuationResult
 
 
@@ -32,10 +35,22 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
     trace_id = braintrust.start_trace("analyze")
 
     try:
+        ctx = await recall_context(request.query, request.session_id, request.user_id)
+        context_block = format_for_prompt(ctx)
+        braintrust.log_span(
+            trace_id,
+            name="memory_recall",
+            input={"query": request.query, "session_id": request.session_id, "user_id": request.user_id},
+            output={
+                "turns_recalled": len(ctx["turns"]),
+                "memories_recalled": [m["text"][:160] for m in ctx["memories"]],
+            },
+        )
+
         fireworks = FireworksClient(api_key=settings.fireworks_api_key, model=settings.fireworks_model)
 
         planner = PlannerAgent(fireworks)
-        tasks = await planner.run(request.query)
+        tasks = await planner.run(request.query, context=context_block)
         braintrust.log_span(trace_id, name="planner", input={"query": request.query}, output={"tasks": tasks})
 
         filings: list[FilingExcerpt] = []
@@ -81,11 +96,23 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
 
         ticker = request.ticker or request.company_name or request.query
         memo_agent = InvestmentMemoAgent(fireworks)
-        memo = await memo_agent.run(ticker=ticker, filings=filings, market=market, valuation=valuation)
+        memo = await memo_agent.run(
+            ticker=ticker, filings=filings, market=market, valuation=valuation, context=context_block
+        )
         braintrust.log_span(trace_id, name="memo", input={"ticker": ticker}, output=memo.model_dump())
 
         braintrust.score(trace_id, confidence=memo.confidence_pct / 100)
+
+        # Writes happen after the response is built, so a slow Atlas write
+        # never sits between the caller's question and Morgan's answer.
+        asyncio.create_task(_persist_memory(request, memo))
         return memo
     except Exception:
         braintrust.score(trace_id, confidence=0.0)
         raise
+
+
+async def _persist_memory(request: AnalysisRequest, memo: InvestmentMemo) -> None:
+    await remember_turn(request.session_id, request.user_id, "user", request.query)
+    await remember_turn(request.session_id, request.user_id, "assistant", memo.executive_summary)
+    await remember_analysis(request.user_id, memo)

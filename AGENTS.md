@@ -25,7 +25,8 @@ this file is about how to work in the repo, not what it is.
 | Polygon (market data) | Yes — `MarketDataAgent` | Depends on `POLYGON_API_KEY` |
 | Daytona (sandboxed compute) | Yes — DCF in `ValuationAgent`, margin scenarios in `/tools/scenario` | Depends on `DAYTONA_API_KEY` |
 | Braintrust (tracing) | Yes — full trace on `/analyze` + `/tools/analyze`, and on `/tools/scenario` | Depends on `BRAINTRUST_API_KEY` / `BRAINTRUST_PROJECT` |
-| ElevenLabs (voice) | Partially — signed-URL session endpoint (`/voice/session`) and both webhook tools (`/tools/analyze`, `/tools/scenario`) are built | **No agent has been provisioned yet.** `scripts/provision_elevenlabs_agent.py` must be run manually (needs real network access to `api.elevenlabs.io`) to get a real `ELEVENLABS_AGENT_ID`. Until that's set, the voice flow can't actually connect. |
+| ElevenLabs (voice) | Partially — signed-URL session endpoint (`/voice/session`) and all three webhook tools (`/tools/analyze`, `/tools/recall`, `/tools/scenario`) are built | **No agent has been provisioned yet.** `scripts/provision_elevenlabs_agent.py` must be run manually (needs real network access to `api.elevenlabs.io`) to get a real `ELEVENLABS_AGENT_ID`. Until that's set, the voice flow can't actually connect. |
+| Memory (MongoDB Atlas + Voyage) | Yes — `src/haxkday/memory/`, wired into `pipeline.run_analysis` (recall before planning, persist after the response is built) and exposed via `/tools/recall` | Depends on `MONGODB_URI` + `VOYAGE_API_KEY`, and running `scripts/init_mongo.py` once (Atlas builds the vector index asynchronously — ~60s). Entirely optional: every function degrades to a no-op without `MONGODB_URI`, verified by test — the pipeline runs identically to before this existed. |
 | Risk Agent, News Agent | Stubs only | Never wired to a live data source — no vendor chosen |
 | FMP, Yahoo Finance clients | Stubs only | Not used by the pipeline yet |
 

@@ -10,6 +10,14 @@ callable from a web dashboard (`/analyze`) or an ElevenLabs Conversational AI
 voice agent (`/tools/analyze`). Market/Risk agents aren't wired to a live
 data source yet (need a Polygon or FMP key).
 
+**Memory:** every request recalls short-term conversation turns (so "compare
+it to AMD" resolves) and long-term semantic memory of past analyses (so
+"what did you tell me about Nvidia last week" works across sessions),
+backed by MongoDB Atlas + Voyage embeddings. `/tools/recall` answers
+memory-only questions without running the full pipeline. Entirely optional —
+leave `MONGODB_URI` unset and everything runs stateless. See
+`src/haxkday/memory/`.
+
 ## Architecture
 
 ```
@@ -35,6 +43,8 @@ src/haxkday/
   agents/         Planner, Research, News, Market Data, Valuation, Risk, Memo agents
   integrations/   Fireworks, ElevenLabs, Braintrust, Daytona, SEC EDGAR,
                   Yahoo Finance, Alpha Vantage, Polygon, FMP clients
+  memory/         Short-term turn log + long-term Atlas Vector Search recall
+                  (store, embeddings, short_term, long_term, recall, remember)
   sandbox/        Financial model functions executed inside Daytona (ratios, DCF, CAGR, ...)
   models/         Pydantic schemas shared across agents (FinancialSnapshot, InvestmentMemo, ...)
   api/            FastAPI app: routes/analyze.py, routes/tools.py (voice-agent webhook), routes/voice.py
@@ -42,7 +52,7 @@ src/haxkday/
   config.py       Settings loaded from environment / .env
 
 frontend/         Next.js + Tailwind dashboard, calling POST /analyze
-scripts/          One-off provisioning (ElevenLabs voice agent)
+scripts/          One-off provisioning (ElevenLabs voice agent, Mongo indexes)
 examples/         Standalone integration usage/demo scripts
 ```
 
@@ -66,7 +76,20 @@ npm run dev
 
 See `.env.example` for the full list: Fireworks, ElevenLabs, Daytona,
 Braintrust, SEC EDGAR (user agent string, no key needed), Alpha Vantage,
-Polygon, FMP.
+Polygon, FMP. Memory (MongoDB Atlas + Voyage) is optional — see below.
+
+## Memory setup (optional)
+
+1. Create a MongoDB Atlas cluster (free M0 tier works), allowlist your IP,
+   and put the connection string in `MONGODB_URI`.
+2. Put a Voyage AI key in `VOYAGE_API_KEY`.
+3. `python scripts/init_mongo.py` — creates the TTL index for short-term
+   turns and the vector index for long-term recall. Atlas builds the vector
+   index asynchronously; give it ~60 seconds before testing `/tools/recall`.
+
+Leave `MONGODB_URI` unset and the whole layer no-ops — every memory function
+degrades to empty/no-op rather than raising, so the pipeline runs exactly as
+it does today.
 
 ## Deploying the backend
 

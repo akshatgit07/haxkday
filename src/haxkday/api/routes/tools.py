@@ -5,7 +5,8 @@ from fastapi import APIRouter, Header, HTTPException
 from ...config import Settings, get_settings
 from ...integrations.braintrust_client import BraintrustClient
 from ...integrations.daytona_client import DaytonaSandboxClient
-from ...models.schemas import AnalysisRequest, ScenarioRequest
+from ...memory import recall_context
+from ...models.schemas import AnalysisRequest, RecallRequest, ScenarioRequest
 from ...pipeline import run_analysis
 from ...sandbox import financial_models
 
@@ -47,6 +48,35 @@ async def analyze_tool(
     if memo.data_gaps:
         summary += f" Note: {', '.join(memo.data_gaps)}."
     return {"summary": summary, "memo": memo.model_dump()}
+
+
+@router.post("/recall")
+async def recall_tool(
+    request: RecallRequest,
+    x_webhook_secret: str | None = Header(default=None, alias="X-Webhook-Secret"),
+) -> dict:
+    """Server-tool webhook for a pure memory lookup, e.g. "what did you tell me
+    about Nvidia last week". Costs one vector search instead of a full
+    Planner -> Research -> Market -> Valuation -> Memo run — give the voice
+    agent this tool and follow-up questions about prior analysis don't have
+    to pay the full pipeline's latency.
+
+    Same shared-secret guard as /tools/analyze. Returns nothing (not an
+    error) if memory isn't configured or nothing relevant was recalled.
+    """
+    settings = get_settings()
+    _require_webhook_secret(settings, x_webhook_secret)
+
+    ctx = await recall_context(request.query, request.session_id, request.user_id)
+    if not ctx["memories"] and not ctx["turns"]:
+        return {"spoken": "I don't have anything on that from our previous conversations."}
+
+    spoken = " ".join(m["text"] for m in ctx["memories"][:2]) or "Only this session so far."
+    return {
+        "spoken": spoken,
+        "memories": ctx["memories"],
+        "turns": [{"role": t["role"], "text": t["text"]} for t in ctx["turns"]],
+    }
 
 
 @router.post("/scenario")
