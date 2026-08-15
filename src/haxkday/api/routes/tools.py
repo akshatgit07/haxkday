@@ -5,6 +5,7 @@ from fastapi import APIRouter, Header, HTTPException
 from ...config import Settings, get_settings
 from ...integrations.braintrust_client import BraintrustClient
 from ...integrations.daytona_client import DaytonaSandboxClient
+from ...integrations.fireworks_client import FireworksError
 from ...memory import recall_context
 from ...models.schemas import AnalysisRequest, RecallRequest, ScenarioRequest
 from ...pipeline import run_analysis
@@ -38,7 +39,10 @@ async def analyze_tool(
     settings = get_settings()
     _require_webhook_secret(settings, x_webhook_secret)
 
-    memo = await run_analysis(request, settings)
+    try:
+        memo = await run_analysis(request, settings)
+    except FireworksError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     summary = (
         f"{memo.ticker}: {memo.recommendation} recommendation, "
         f"{memo.confidence_pct:.0f} percent confidence. {memo.executive_summary}"
