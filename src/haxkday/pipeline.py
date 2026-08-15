@@ -50,32 +50,37 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         fireworks = FireworksClient(api_key=settings.fireworks_api_key, model=settings.fireworks_model)
 
         planner = PlannerAgent(fireworks)
-        tasks = await planner.run(request.query, context=context_block)
-        braintrust.log_span(trace_id, name="planner", input={"query": request.query}, output={"tasks": tasks})
+        plan = await planner.run(request.query, context=context_block)
+        braintrust.log_span(trace_id, name="planner", input={"query": request.query}, output=plan)
+
+        # An explicit ticker from the caller always wins; otherwise fall back to
+        # what the planner resolved from the question text (and conversation
+        # context) so "optional" ticker actually means optional, not "skipped".
+        resolved_ticker = request.ticker or plan["ticker"]
 
         filings: list[FilingExcerpt] = []
         market: MarketSnapshot | None = None
         valuation: ValuationResult | None = None
-        if request.ticker:
+        if resolved_ticker:
             research = ResearchAgent(SecEdgarClient(user_agent=settings.sec_edgar_user_agent))
-            filings = await research.run(request.ticker)
+            filings = await research.run(resolved_ticker)
             braintrust.log_span(
                 trace_id,
                 name="research",
-                input={"ticker": request.ticker},
+                input={"ticker": resolved_ticker},
                 output={"filing_types": [f.filing_type for f in filings]},
             )
 
             market_agent = MarketDataAgent(PolygonClient(api_key=settings.polygon_api_key))
             try:
-                market = await market_agent.run(request.ticker)
+                market = await market_agent.run(resolved_ticker)
             except (httpx.HTTPError, ValueError) as exc:
                 braintrust.log_span(
-                    trace_id, name="market", input={"ticker": request.ticker}, output={"error": str(exc)}
+                    trace_id, name="market", input={"ticker": resolved_ticker}, output={"error": str(exc)}
                 )
             else:
                 braintrust.log_span(
-                    trace_id, name="market", input={"ticker": request.ticker}, output=market.model_dump()
+                    trace_id, name="market", input={"ticker": resolved_ticker}, output=market.model_dump()
                 )
 
             valuation_agent = ValuationAgent(
@@ -83,18 +88,18 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
                 DaytonaSandboxClient(api_key=settings.daytona_api_key),
             )
             try:
-                valuation = await valuation_agent.run(request.ticker)
+                valuation = await valuation_agent.run(resolved_ticker)
             except (httpx.HTTPError, ValueError, RuntimeError) as exc:
                 # Data source unavailable/rate-limited/unknown ticker — proceed without it.
                 braintrust.log_span(
-                    trace_id, name="valuation", input={"ticker": request.ticker}, output={"error": str(exc)}
+                    trace_id, name="valuation", input={"ticker": resolved_ticker}, output={"error": str(exc)}
                 )
             else:
                 braintrust.log_span(
-                    trace_id, name="valuation", input={"ticker": request.ticker}, output=valuation.model_dump()
+                    trace_id, name="valuation", input={"ticker": resolved_ticker}, output=valuation.model_dump()
                 )
 
-        ticker = request.ticker or request.company_name or request.query
+        ticker = resolved_ticker or request.company_name or request.query
         memo_agent = InvestmentMemoAgent(fireworks)
         memo = await memo_agent.run(
             ticker=ticker, filings=filings, market=market, valuation=valuation, context=context_block
