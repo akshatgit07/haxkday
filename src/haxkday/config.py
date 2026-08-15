@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     polygon_api_key: str = Field(default="", alias="POLYGON_API_KEY")
     fmp_api_key: str = Field(default="", alias="FMP_API_KEY")
 
+    # Web search fallback for when SEC EDGAR fails or has nothing (optional).
+    firecrawl_api_key: str = Field(default="", alias="FIRECRAWL_API_KEY")
+    firecrawl_api_url: str = Field(default="https://api.firecrawl.dev", alias="FIRECRAWL_API_URL")
+
     # Web
     cors_allowed_origins: str = Field(default="http://localhost:3000", alias="CORS_ALLOWED_ORIGINS")
 

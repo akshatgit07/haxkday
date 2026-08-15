@@ -34,7 +34,11 @@ _SYSTEM_PROMPT = (
     "on a filing, cite it by name in executive_summary the way a real "
     "analyst would (\"According to the Q2 10-Q...\"). Never imply you have "
     "data you weren't given — if valuation, market, or risk data is null, "
-    "say so plainly rather than guessing.\n\n"
+    "say so plainly rather than guessing. If current_web_research is "
+    "present, it's a fallback used only because no SEC filing was "
+    "available — attribute anything drawn from it to \"a web search\" or "
+    "the source's name, never phrase it as if it came from a filing, and "
+    "say plainly that no filing was on file.\n\n"
     "Continuity: if conversation_context includes a prior analysis of this "
     "same ticker for this user, reference it only when the view has clearly "
     "changed (\"this raises confidence from the prior hold\") — never "
@@ -67,8 +71,13 @@ class InvestmentMemoAgent(Agent):
         research_error: str | None = None,
         market_error: str | None = None,
         valuation_error: str | None = None,
+        web_research: list[dict[str, str]] | None = None,
     ) -> InvestmentMemo:
+        web_research = web_research or []
         sources = [f"SEC {f.filing_type}, fiscal period {f.fiscal_period}" for f in filings]
+        # Clearly labeled "Web:" so a search-result citation is never mistaken
+        # for an actual filing — it's a fallback, not an equivalent source.
+        sources.extend(f"Web: {item['title']} ({item['url']})" for item in web_research if item.get("url"))
         data_gaps = _data_gaps(filings, market, valuation, risk, research_error, market_error, valuation_error)
 
         user_prompt = json.dumps(
@@ -80,6 +89,7 @@ class InvestmentMemoAgent(Agent):
                 "risk": risk.model_dump() if risk else None,
                 "available_sources": sources,
                 "known_data_gaps": data_gaps,
+                "current_web_research": web_research or None,
                 "conversation_context": context or None,
             }
         )

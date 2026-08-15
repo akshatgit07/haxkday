@@ -15,6 +15,7 @@ dependencies = [
     "pymongo>=4.9",
     "voyageai>=0.3",
     "cffi>=1.17",
+    "firecrawl-py>=4.22.1",
 ]
 
 [build-system]
