@@ -21,6 +21,7 @@ this file is about how to work in the repo, not what it is.
 |---|---|---|
 | Fireworks (LLM reasoning) | Yes — `PlannerAgent`, `InvestmentMemoAgent` | Depends on `FIREWORKS_API_KEY` being set wherever it's deployed |
 | SEC EDGAR (filings) | Yes — `ResearchAgent` | No key needed, just a `SEC_EDGAR_USER_AGENT` string |
+| Firecrawl (web search fallback) | Yes — `pipeline.py` only calls it when SEC EDGAR returns zero filings, never alongside a successful EDGAR fetch | Depends on `FIRECRAWL_API_KEY`. Sources are prefixed `"Web: ..."`, never conflated with a real filing citation |
 | Alpha Vantage (fundamentals) | Yes — feeds `ValuationAgent` | Depends on `ALPHA_VANTAGE_API_KEY` |
 | Polygon (market data) | Yes — `MarketDataAgent` | Depends on `POLYGON_API_KEY` |
 | Daytona (sandboxed compute) | Yes — DCF in `ValuationAgent`, margin scenarios in `/tools/scenario` | Depends on `DAYTONA_API_KEY` |
