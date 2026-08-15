@@ -1,7 +1,7 @@
 """Provisions the ElevenLabs Conversational AI voice agent for Morgan AI.
 
 Creates an agent that answers financial questions by voice and calls this
-backend's tool webhooks (POST /tools/analyze, POST /tools/scenario) whenever
+backend's tool webhooks (POST /tools/analyze, POST /tools/recall, POST /tools/scenario) whenever
 the user asks for a real investment analysis or a quick "what if" scenario,
 sending the shared webhook secret as a static header.
 
@@ -43,6 +43,8 @@ SYSTEM_PROMPT = (
     "the revenue, total costs, and the specific cost category's current "
     "amount and percentage change. If you don't have the baseline figures, "
     "ask for them rather than guessing."
+    "\n\nWhen the user asks what Morgan said previously, or refers to a prior "
+    "conversation, call the recall_memory tool before answering."
 )
 
 FIRST_MESSAGE = "Morgan. What would you like reviewed?"
@@ -127,6 +129,30 @@ def build_scenario_tool(backend_url: str, webhook_secret: str) -> dict:
     }
 
 
+def build_recall_tool(backend_url: str, webhook_secret: str) -> dict:
+    return {
+        "type": "webhook",
+        "name": "recall_memory",
+        "description": "Looks up relevant facts and prior analysis from this user's conversation history.",
+        "response_timeout_secs": 10,
+        "interruption_mode": "allow",
+        "api_schema": {
+            "url": f"{backend_url.rstrip('/')}/tools/recall",
+            "method": "POST",
+            "request_headers": {"X-Webhook-Secret": webhook_secret},
+            "request_body_schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {"type": "string", "description": "The fact or prior answer to recall."},
+                    "session_id": {"type": "string", "description": "Current conversation session, if known."},
+                    "user_id": {"type": "string", "description": "Current user identifier, if known."},
+                },
+            },
+        },
+    }
+
+
 def build_conversation_config(backend_url: str, webhook_secret: str, voice_id: str) -> dict:
     config: dict = {
         "agent": {
@@ -136,6 +162,7 @@ def build_conversation_config(backend_url: str, webhook_secret: str, voice_id: s
                 "prompt": SYSTEM_PROMPT,
                 "tools": [
                     build_analyze_tool(backend_url, webhook_secret),
+                    build_recall_tool(backend_url, webhook_secret),
                     build_scenario_tool(backend_url, webhook_secret),
                 ],
             },
