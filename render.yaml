@@ -9,7 +9,7 @@ services:
       - key: FIREWORKS_API_KEY
         sync: false
       - key: FIREWORKS_MODEL
-        value: accounts/fireworks/models/llama-v3p1-70b-instruct
+        value: accounts/fireworks/models/gpt-oss-120b
       - key: ELEVENLABS_API_KEY
         sync: false
       - key: ELEVENLABS_VOICE_ID
