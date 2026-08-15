@@ -23,6 +23,26 @@ from .memory import format_for_prompt, recall_context, remember_analysis, rememb
 from .models.schemas import AnalysisRequest, FilingExcerpt, InvestmentMemo, MarketSnapshot, ValuationResult
 
 
+def _safe_error_summary(exc: Exception) -> str:
+    """A short, diagnosable error description safe to put in an HTTP response.
+
+    The raw exception text from an httpx error embeds the full request URL —
+    and Alpha Vantage and Polygon both authenticate via an `apikey`/`apiKey`
+    query parameter, so `str(exc)` would leak the key straight into the
+    memo's data_gaps. This reports the host and status/error class instead,
+    which is enough to diagnose "wrong key" vs "rate limited" vs "network
+    error" without ever touching the query string.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code} from {exc.request.url.host}"
+    if isinstance(exc, httpx.RequestError):
+        host = exc.request.url.host if exc.request is not None else "the data source"
+        return f"{exc.__class__.__name__} contacting {host}"
+    # ValueErrors raised by our own clients carry the response body, not the
+    # request URL, so they're already safe to surface as-is.
+    return str(exc)
+
+
 async def run_analysis(request: AnalysisRequest, settings: Settings) -> InvestmentMemo:
     """Run the pipeline for a request, tracing every step to Braintrust.
 
@@ -61,22 +81,35 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         filings: list[FilingExcerpt] = []
         market: MarketSnapshot | None = None
         valuation: ValuationResult | None = None
+        research_error: str | None = None
+        market_error: str | None = None
+        valuation_error: str | None = None
         if resolved_ticker:
             research = ResearchAgent(SecEdgarClient(user_agent=settings.sec_edgar_user_agent))
-            filings = await research.run(resolved_ticker)
-            braintrust.log_span(
-                trace_id,
-                name="research",
-                input={"ticker": resolved_ticker},
-                output={"filing_types": [f.filing_type for f in filings]},
-            )
+            try:
+                filings = await research.run(resolved_ticker)
+            except httpx.HTTPError as exc:
+                # A SEC EDGAR outage or a missing/rejected User-Agent shouldn't
+                # crash the whole request — degrade like market/valuation do.
+                research_error = _safe_error_summary(exc)
+                braintrust.log_span(
+                    trace_id, name="research", input={"ticker": resolved_ticker}, output={"error": research_error}
+                )
+            else:
+                braintrust.log_span(
+                    trace_id,
+                    name="research",
+                    input={"ticker": resolved_ticker},
+                    output={"filing_types": [f.filing_type for f in filings]},
+                )
 
             market_agent = MarketDataAgent(PolygonClient(api_key=settings.polygon_api_key))
             try:
                 market = await market_agent.run(resolved_ticker)
             except (httpx.HTTPError, ValueError) as exc:
+                market_error = _safe_error_summary(exc)
                 braintrust.log_span(
-                    trace_id, name="market", input={"ticker": resolved_ticker}, output={"error": str(exc)}
+                    trace_id, name="market", input={"ticker": resolved_ticker}, output={"error": market_error}
                 )
             else:
                 braintrust.log_span(
@@ -91,8 +124,9 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
                 valuation = await valuation_agent.run(resolved_ticker)
             except (httpx.HTTPError, ValueError, RuntimeError) as exc:
                 # Data source unavailable/rate-limited/unknown ticker — proceed without it.
+                valuation_error = _safe_error_summary(exc)
                 braintrust.log_span(
-                    trace_id, name="valuation", input={"ticker": resolved_ticker}, output={"error": str(exc)}
+                    trace_id, name="valuation", input={"ticker": resolved_ticker}, output={"error": valuation_error}
                 )
             else:
                 braintrust.log_span(
@@ -102,7 +136,14 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         ticker = resolved_ticker or request.company_name or request.query
         memo_agent = InvestmentMemoAgent(fireworks)
         memo = await memo_agent.run(
-            ticker=ticker, filings=filings, market=market, valuation=valuation, context=context_block
+            ticker=ticker,
+            filings=filings,
+            market=market,
+            valuation=valuation,
+            context=context_block,
+            research_error=research_error,
+            market_error=market_error,
+            valuation_error=valuation_error,
         )
         braintrust.log_span(trace_id, name="memo", input={"ticker": ticker}, output=memo.model_dump())
 

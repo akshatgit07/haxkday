@@ -64,9 +64,12 @@ class InvestmentMemoAgent(Agent):
         valuation: ValuationResult | None = None,
         risk: RiskAssessment | None = None,
         context: str = "",
+        research_error: str | None = None,
+        market_error: str | None = None,
+        valuation_error: str | None = None,
     ) -> InvestmentMemo:
         sources = [f"SEC {f.filing_type}, fiscal period {f.fiscal_period}" for f in filings]
-        data_gaps = _data_gaps(filings, market, valuation, risk)
+        data_gaps = _data_gaps(filings, market, valuation, risk, research_error, market_error, valuation_error)
 
         user_prompt = json.dumps(
             {
@@ -97,16 +100,19 @@ def _data_gaps(
     market: MarketSnapshot | None,
     valuation: ValuationResult | None,
     risk: RiskAssessment | None,
+    research_error: str | None = None,
+    market_error: str | None = None,
+    valuation_error: str | None = None,
 ) -> list[str]:
     gaps = []
     if not filings:
-        gaps.append("No SEC filings on file for this company")
+        gaps.append(f"No SEC filings on file for this company ({research_error})" if research_error else "No SEC filings on file for this company")
     if valuation is None or valuation.dcf_fair_value is None:
-        gaps.append("Valuation data unavailable")
+        gaps.append(f"Valuation data unavailable ({valuation_error})" if valuation_error else "Valuation data unavailable")
     if market is None:
-        gaps.append("Live market data unavailable")
+        gaps.append(f"Live market data unavailable ({market_error})" if market_error else "Live market data unavailable")
     if risk is None:
-        gaps.append("Risk assessment not available")
+        gaps.append("Risk assessment not available — Risk Agent isn't wired to a live data source yet")
     return gaps
 
 
