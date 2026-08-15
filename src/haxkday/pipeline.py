@@ -87,6 +87,18 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         market_error: str | None = None
         valuation_error: str | None = None
         if resolved_ticker:
+            # Kicked off now, awaited later — runs concurrently with
+            # research/market/valuation below rather than waiting on any of
+            # them. Every request with a ticker gets this, not just ones
+            # where EDGAR/Polygon/Alpha Vantage come back empty, so the memo
+            # agent always has some current web context to draw on for
+            # whatever ends up missing.
+            firecrawl_task = asyncio.create_task(
+                FirecrawlClient(
+                    api_key=settings.firecrawl_api_key, api_url=settings.firecrawl_api_url
+                ).search_company(resolved_ticker, request.query)
+            )
+
             research = ResearchAgent(SecEdgarClient(user_agent=settings.sec_edgar_user_agent))
             try:
                 filings = await research.run(resolved_ticker)
@@ -104,29 +116,6 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
                     input={"ticker": resolved_ticker},
                     output={"filing_types": [f.filing_type for f in filings]},
                 )
-
-            if not filings:
-                # EDGAR failed or has nothing for this ticker — fall back to a
-                # web search so the memo isn't working from zero grounding.
-                # Never runs when EDGAR actually succeeded.
-                try:
-                    web_research = await FirecrawlClient(
-                        api_key=settings.firecrawl_api_key, api_url=settings.firecrawl_api_url
-                    ).search_company(resolved_ticker, request.query)
-                except Exception as exc:  # noqa: BLE001 - a fallback must never itself take the request down
-                    braintrust.log_span(
-                        trace_id,
-                        name="web_research",
-                        input={"ticker": resolved_ticker},
-                        output={"error": str(exc)},
-                    )
-                else:
-                    braintrust.log_span(
-                        trace_id,
-                        name="web_research",
-                        input={"ticker": resolved_ticker},
-                        output={"sources": [item["url"] for item in web_research]},
-                    )
 
             market_agent = MarketDataAgent(PolygonClient(api_key=settings.polygon_api_key))
             try:
@@ -156,6 +145,20 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
             else:
                 braintrust.log_span(
                     trace_id, name="valuation", input={"ticker": resolved_ticker}, output=valuation.model_dump()
+                )
+
+            try:
+                web_research = await firecrawl_task
+            except Exception as exc:  # noqa: BLE001 - Firecrawl must never itself take the request down
+                braintrust.log_span(
+                    trace_id, name="web_research", input={"ticker": resolved_ticker}, output={"error": str(exc)}
+                )
+            else:
+                braintrust.log_span(
+                    trace_id,
+                    name="web_research",
+                    input={"ticker": resolved_ticker},
+                    output={"sources": [item["url"] for item in web_research]},
                 )
 
         ticker = resolved_ticker or request.company_name or request.query

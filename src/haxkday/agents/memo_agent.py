@@ -34,11 +34,18 @@ _SYSTEM_PROMPT = (
     "on a filing, cite it by name in executive_summary the way a real "
     "analyst would (\"According to the Q2 10-Q...\"). Never imply you have "
     "data you weren't given — if valuation, market, or risk data is null, "
-    "say so plainly rather than guessing. If current_web_research is "
-    "present, it's a fallback used only because no SEC filing was "
-    "available — attribute anything drawn from it to \"a web search\" or "
-    "the source's name, never phrase it as if it came from a filing, and "
-    "say plainly that no filing was on file.\n\n"
+    "say so plainly rather than guessing.\n\n"
+    "current_web_research runs on every request alongside the structured "
+    "data sources, not just when one of them fails — use it for whatever "
+    "it's useful for: recent filings context, market color, valuation "
+    "commentary, or risk factors. It is never a substitute for a verified "
+    "structured field (a real filing, a real Polygon price, a real DCF from "
+    "Alpha Vantage/Daytona) — attribute anything drawn from it to \"a web "
+    "search\" or the source's name, never phrase it as if it came from the "
+    "structured source. If a structured field (filings/market/valuation) is "
+    "still null even with web research present, say so plainly — do not let "
+    "web research make an actually-missing structured field sound "
+    "resolved.\n\n"
     "Continuity: if conversation_context includes a prior analysis of this "
     "same ticker for this user, reference it only when the view has clearly "
     "changed (\"this raises confidence from the prior hold\") — never "
@@ -78,7 +85,9 @@ class InvestmentMemoAgent(Agent):
         # Clearly labeled "Web:" so a search-result citation is never mistaken
         # for an actual filing — it's a fallback, not an equivalent source.
         sources.extend(f"Web: {item['title']} ({item['url']})" for item in web_research if item.get("url"))
-        data_gaps = _data_gaps(filings, market, valuation, risk, research_error, market_error, valuation_error)
+        data_gaps = _data_gaps(
+            filings, market, valuation, risk, research_error, market_error, valuation_error, bool(web_research)
+        )
 
         user_prompt = json.dumps(
             {
@@ -113,16 +122,25 @@ def _data_gaps(
     research_error: str | None = None,
     market_error: str | None = None,
     valuation_error: str | None = None,
+    web_research_used: bool = False,
 ) -> list[str]:
+    # Web research can inform the memo's commentary, but it's never a real
+    # substitute for a verified structured field — a gap stays a gap, just
+    # noted as partially offset rather than quietly marked resolved.
+    substitute = " — partially offset by web search" if web_research_used else ""
     gaps = []
     if not filings:
-        gaps.append(f"No SEC filings on file for this company ({research_error})" if research_error else "No SEC filings on file for this company")
+        base = f"No SEC filings on file for this company ({research_error})" if research_error else "No SEC filings on file for this company"
+        gaps.append(base + substitute)
     if valuation is None or valuation.dcf_fair_value is None:
-        gaps.append(f"Valuation data unavailable ({valuation_error})" if valuation_error else "Valuation data unavailable")
+        base = f"Valuation data unavailable ({valuation_error})" if valuation_error else "Valuation data unavailable"
+        gaps.append(base + substitute)
     if market is None:
-        gaps.append(f"Live market data unavailable ({market_error})" if market_error else "Live market data unavailable")
+        base = f"Live market data unavailable ({market_error})" if market_error else "Live market data unavailable"
+        gaps.append(base + substitute)
     if risk is None:
-        gaps.append("Risk assessment not available — Risk Agent isn't wired to a live data source yet")
+        base = "Risk assessment not available — Risk Agent isn't wired to a live data source yet"
+        gaps.append(base + substitute)
     return gaps
 
 
