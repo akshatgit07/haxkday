@@ -8,9 +8,12 @@ import type { InvestmentMemo, ScenarioInputs, ScenarioResult } from "@/lib/types
 import { caprasimo, figtree } from "@/lib/fonts";
 import "@/styles/organic-theme.css";
 
+import EvidencePanel from "./EvidencePanel";
 import LiveMemoCard from "./LiveMemoCard";
 import MarketPanel from "./MarketPanel";
 import ScenarioResultCard from "./ScenarioResultCard";
+
+const RECENT_LIMIT = 4;
 
 interface ToolActivity {
   toolName: string;
@@ -46,9 +49,16 @@ export default function LiveCompanion() {
   const [activity, setActivity] = useState<ToolActivity | null>(null);
   const [memo, setMemo] = useState<InvestmentMemo | null>(null);
   const [scenario, setScenario] = useState<ScenarioState | null>(null);
+  const [askedQuestion, setAskedQuestion] = useState<string | null>(null);
+  const [recentQuestions, setRecentQuestions] = useState<string[]>([]);
 
   const conversation = useConversation({
     onError: (err) => setError(typeof err === "string" ? err : "Connection error"),
+    onMessage: ({ message, source }) => {
+      if (source !== "user" || !message.trim()) return;
+      setAskedQuestion(message);
+      setRecentQuestions((prev) => [message, ...prev.filter((q) => q !== message)].slice(0, RECENT_LIMIT));
+    },
     onAgentToolRequest: (req) => {
       setActivity({ toolName: req.tool_name, status: "calling" });
     },
@@ -212,7 +222,62 @@ export default function LiveCompanion() {
           </p>
         )}
 
-        {memo?.market && <MarketPanel market={memo.market} valuation={memo.valuation} />}
+        {recentQuestions.length > 0 && !memo && !scenario && (
+          <div style={{ width: "100%", maxWidth: 480 }}>
+            <h2 style={{ fontFamily: "var(--font-heading)", fontSize: 14, color: "var(--color-text)", margin: "0 0 8px" }}>
+              Recent
+            </h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {recentQuestions.map((q, i) => (
+                <div key={`${q}-${i}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 2px" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--color-accent)", flex: "none" }} />
+                  <span style={{ fontSize: 13, color: NEUTRAL_700 }}>{q}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(memo || scenario) && askedQuestion && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, width: "100%", maxWidth: 640 }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                background: "var(--color-accent)",
+                flex: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "var(--font-heading)",
+                color: "#fff",
+                fontSize: 12,
+              }}
+            >
+              Q
+            </div>
+            <p style={{ fontFamily: "var(--font-heading)", fontSize: 16, color: "var(--color-text)", margin: 0, paddingTop: 3 }}>
+              {askedQuestion}
+            </p>
+          </div>
+        )}
+
+        {memo?.market && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+              gap: 16,
+              width: "100%",
+              maxWidth: 640,
+              alignItems: "start",
+            }}
+          >
+            <MarketPanel market={memo.market} valuation={memo.valuation} />
+            <EvidencePanel memo={memo} />
+          </div>
+        )}
         {memo && <LiveMemoCard memo={memo} />}
         {scenario && <ScenarioResultCard result={scenario.result} inputs={scenario.inputs} summary={scenario.summary} />}
       </main>
