@@ -17,6 +17,7 @@ from .integrations.alpha_vantage_client import AlphaVantageClient
 from .integrations.braintrust_client import BraintrustClient
 from .integrations.daytona_client import DaytonaSandboxClient
 from .integrations.fireworks_client import FireworksClient
+from .integrations.firecrawl_client import FirecrawlClient
 from .integrations.polygon_client import PolygonClient
 from .integrations.sec_edgar_client import SecEdgarClient
 from .memory import format_for_prompt, recall_context, remember_analysis, remember_turn
@@ -56,6 +57,7 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
         filings: list[FilingExcerpt] = []
         market: MarketSnapshot | None = None
         valuation: ValuationResult | None = None
+        web_research: list[dict[str, str]] = []
         if request.ticker:
             research = ResearchAgent(SecEdgarClient(user_agent=settings.sec_edgar_user_agent))
             filings = await research.run(request.ticker)
@@ -94,10 +96,33 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
                     trace_id, name="valuation", input={"ticker": request.ticker}, output=valuation.model_dump()
                 )
 
+            try:
+                web_research = await FirecrawlClient(
+                    api_key=settings.firecrawl_api_key,
+                    api_url=settings.firecrawl_api_url,
+                ).search_company(request.ticker, request.query)
+            except Exception as exc:
+                # Web research is a fallback; it must never take down analysis.
+                braintrust.log_span(
+                    trace_id, name="web_research", input={"ticker": request.ticker}, output={"error": str(exc)}
+                )
+            else:
+                braintrust.log_span(
+                    trace_id,
+                    name="web_research",
+                    input={"ticker": request.ticker},
+                    output={"sources": [item.get("url") for item in web_research]},
+                )
+
         ticker = request.ticker or request.company_name or request.query
         memo_agent = InvestmentMemoAgent(fireworks)
         memo = await memo_agent.run(
-            ticker=ticker, filings=filings, market=market, valuation=valuation, context=context_block
+            ticker=ticker,
+            filings=filings,
+            market=market,
+            valuation=valuation,
+            context=context_block,
+            web_research=web_research,
         )
         braintrust.log_span(trace_id, name="memo", input={"ticker": ticker}, output=memo.model_dump())
 

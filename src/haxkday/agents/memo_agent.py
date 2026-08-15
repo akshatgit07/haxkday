@@ -64,8 +64,11 @@ class InvestmentMemoAgent(Agent):
         valuation: ValuationResult | None = None,
         risk: RiskAssessment | None = None,
         context: str = "",
+        web_research: list[dict[str, str]] | None = None,
     ) -> InvestmentMemo:
         sources = [f"SEC {f.filing_type}, fiscal period {f.fiscal_period}" for f in filings]
+        web_research = web_research or []
+        sources.extend(f"Web: {item['title']} ({item['url']})" for item in web_research if item.get("url"))
         data_gaps = _data_gaps(filings, market, valuation, risk)
 
         user_prompt = json.dumps(
@@ -77,6 +80,7 @@ class InvestmentMemoAgent(Agent):
                 "risk": risk.model_dump() if risk else None,
                 "available_sources": sources,
                 "known_data_gaps": data_gaps,
+                "current_web_research": web_research,
                 "conversation_context": context or None,
             }
         )
