@@ -174,6 +174,10 @@ async def run_analysis(request: AnalysisRequest, settings: Settings) -> Investme
             valuation_error=valuation_error,
             web_research=web_research,
         )
+        # Attach the raw structured data the memo was written from, so a
+        # caller can render real numbers/a real chart instead of only the
+        # LLM's prose summary of them.
+        memo = memo.model_copy(update={"market": market, "valuation": valuation})
         braintrust.log_span(trace_id, name="memo", input={"ticker": ticker}, output=memo.model_dump())
 
         braintrust.score(trace_id, confidence=memo.confidence_pct / 100)

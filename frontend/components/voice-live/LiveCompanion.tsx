@@ -9,6 +9,7 @@ import { caprasimo, figtree } from "@/lib/fonts";
 import "@/styles/organic-theme.css";
 
 import LiveMemoCard from "./LiveMemoCard";
+import MarketPanel from "./MarketPanel";
 import ScenarioResultCard from "./ScenarioResultCard";
 
 interface ToolActivity {
@@ -211,6 +212,7 @@ export default function LiveCompanion() {
           </p>
         )}
 
+        {memo?.market && <MarketPanel market={memo.market} valuation={memo.valuation} />}
         {memo && <LiveMemoCard memo={memo} />}
         {scenario && <ScenarioResultCard result={scenario.result} inputs={scenario.inputs} summary={scenario.summary} />}
       </main>

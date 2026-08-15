@@ -37,9 +37,14 @@ class MarketSnapshot(BaseModel):
 
     ticker: str
     price: float
+    day_change_pct: float | None = None
     market_cap: float | None = None
     analyst_estimates: dict[str, float] = {}
     recent_news: list[str] = []
+    # Daily closes, chronological (oldest first), ~30 trading days — real
+    # bars from Polygon, not synthesized. Empty if the aggregates call fails;
+    # never fabricated to make a chart look complete.
+    price_history: list[float] = []
 
 
 class FinancialSnapshot(BaseModel):
@@ -89,6 +94,11 @@ class InvestmentMemo(BaseModel):
     # never trust the model to self-report what it was and wasn't given.
     sources: list[str] = []
     data_gaps: list[str] = []
+    # The raw structured data the memo's prose was written from, so a caller
+    # (the live voice companion) can render real numbers and a real chart
+    # instead of just the LLM's summary of them.
+    market: MarketSnapshot | None = None
+    valuation: ValuationResult | None = None
 
 
 class ScenarioRequest(BaseModel):

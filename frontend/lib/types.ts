@@ -6,6 +6,24 @@ export interface AnalysisRequest {
 
 export type Recommendation = "BUY" | "HOLD" | "SELL";
 
+export interface MarketSnapshot {
+  ticker: string;
+  price: number;
+  day_change_pct: number | null;
+  market_cap: number | null;
+  analyst_estimates: Record<string, number>;
+  recent_news: string[];
+  price_history: number[];
+}
+
+export interface ValuationResult {
+  dcf_fair_value: number | null;
+  pe_ratio: number | null;
+  ev_ebitda: number | null;
+  peg_ratio: number | null;
+  comparable_companies: string[];
+}
+
 export interface InvestmentMemo {
   ticker: string;
   executive_summary: string;
@@ -16,6 +34,8 @@ export interface InvestmentMemo {
   confidence_pct: number;
   sources: string[];
   data_gaps: string[];
+  market: MarketSnapshot | null;
+  valuation: ValuationResult | null;
 }
 
 export interface ScenarioResult {

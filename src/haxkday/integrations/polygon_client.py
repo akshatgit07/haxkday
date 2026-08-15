@@ -58,11 +58,23 @@ class PolygonClient:
             news_response.raise_for_status()
             headlines = [item["title"] for item in news_response.json().get("results", [])]
 
+            day_change_pct = ticker_data.get("todaysChangePerc")
+
+        try:
+            bars = await self.get_aggregates(ticker, "day", 30)
+            price_history = [bar["c"] for bar in bars if "c" in bar]
+        except (httpx.HTTPError, ValueError):
+            # A chart is a nice-to-have on top of the snapshot — never let
+            # its failure take down the snapshot itself.
+            price_history = []
+
         return MarketSnapshot(
             ticker=ticker,
             price=price,
+            day_change_pct=day_change_pct,
             market_cap=market_cap,
             # Polygon doesn't provide analyst estimates on this tier.
             analyst_estimates={},
             recent_news=headlines,
+            price_history=price_history,
         )
