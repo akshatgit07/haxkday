@@ -18,7 +18,18 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health() -> dict:
-        return {"status": "ok", "memory": "on" if memory_store.enabled() else "off"}
+        settings = get_settings()
+        return {
+            "status": "ok",
+            "memory": "on" if memory_store.enabled() else "off",
+            # This only confirms the key is *set*, not that Braintrust accepts
+            # it — the SDK logs asynchronously in a background thread and
+            # swallows auth/network failures there (prints a traceback to
+            # stderr instead of raising), so a bad key never surfaces as a
+            # request-level error. Check Render's log stream for a printed
+            # traceback if traces aren't showing up despite this saying "on".
+            "braintrust": "configured" if settings.braintrust_api_key else "not configured",
+        }
 
     @app.get("/")
     async def root() -> dict:
